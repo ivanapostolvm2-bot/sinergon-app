@@ -51,9 +51,9 @@ app.get('/', (req, res) => {
                     ${errorMsg}
                     <form method="POST" action="/login">
                         <label>Потребителско име:</label>
-                        <input type="text" name="username" style="width:100%; padding:10px; margin:8px 0; box-sizing:border-box;" required>
+                        <input type="text" name="username" style="width:100%; padding:10px; margin:8px 0; box-sizing:border-box;" required><br>
                         <label>Парола:</label>
-                        <input type="password" name="password" style="width:100%; padding:10px; margin:8px 0; box-sizing:border-box;" required>
+                        <input type="password" name="password" style="width:100%; padding:10px; margin:8px 0; box-sizing:border-box;" required><br>
                         <button type="submit" style="width:100%; padding:12px; background:#0275d8; color:white; border:none; border-radius:4px; font-size:16px; cursor:pointer; font-weight:bold;">Влез</button>
                     </form>
                 </div>
@@ -65,7 +65,7 @@ app.get('/', (req, res) => {
     const isAdmin = req.session.user.role === 'admin';
     const isSales = req.session.user.role === 'sales';
 
-    // Генериране на редовете в таблицата за служители
+    // Таблица служители
     let rows = global.usersList.map(u => {
         let deleteButton = '';
         if (isAdmin && u.username !== req.session.user.username) {
@@ -87,14 +87,14 @@ app.get('/', (req, res) => {
         `;
     }).join('');
 
-    // Генериране на списъка с правила
+    // Списък правила
     let rulesRows = global.rulesList.map(r => `
         <li style="padding:8px 0; border-bottom:1px dashed #eee;">
             ${r.text} ${isAdmin ? `<a href="/delete-rule/${r.id}" style="color:red; text-decoration:none; font-size:12px; margin-left:10px;">[Изтрий]</a>` : ''}
         </li>
     `).join('');
 
-    // Генериране на тестовете
+    // Тестове
     let testsRows = global.testsList.map(t => `
         <div style="margin-bottom:15px; padding:10px; background:#f9f9f9; border-left:4px solid #0275d8;">
             <p style="margin:0 0 5px 0; font-weight:bold;">Въпрос: ${t.question}</p>
@@ -110,13 +110,12 @@ app.get('/', (req, res) => {
             <div style="margin-top:30px; padding:20px; background:#fdf7f7; border:2px solid #d9534f; border-radius:6px;">
                 <h3 style="margin-top:0; color:#c9302c;">⚙️ Управление на системата (Само за Шефове)</h3>
                 
-                <!-- ФОРМА 1: РЕГИСТРАЦИЯ -->
                 <form method="POST" action="/add-user" style="margin-bottom:20px; padding-bottom:20px; border-bottom:1px solid #eee;">
                     <h4>➕ Регистрация на нов човек</h4>
                     <input type="text" name="username" placeholder="Потребителско име" style="width:100%; padding:8px; margin:4px 0; box-sizing:border-box;" required><br>
                     <input type="password" name="password" placeholder="Парола" style="width:100%; padding:8px; margin:4px 0; box-sizing:border-box;" required><br>
                     <input type="text" name="full_name" placeholder="Име и Фамилия" style="width:100%; padding:8px; margin:4px 0; box-sizing:border-box;" required><br>
-                    <input type="text" name="position" placeholder="Длъжност (напр. Продажби Енергия)" style="width:100%; padding:8px; margin:4px 0; box-sizing:border-box;" required><br>
+                    <input type="text" name="position" placeholder="Длъжност" style="width:100%; padding:8px; margin:4px 0; box-sizing:border-box;" required><br>
                     <select name="role" style="width:100%; padding:8px; margin:4px 0; box-sizing:border-box;">
                         <option value="sales">Продаващ ток (Вижда правилата и тестовете)</option>
                         <option value="manager">Мениджър (Само преглед на списъка)</option>
@@ -125,17 +124,15 @@ app.get('/', (req, res) => {
                     <button type="submit" style="margin-top:8px; padding:10px 15px; background:#d9534f; color:white; border:none; border-radius:4px; cursor:pointer; font-weight:bold;">Регистрирай служител</button>
                 </form>
 
-                <!-- ФОРМА 2: ДОБАВЯНЕ НА ПРАВИЛО -->
                 <form method="POST" action="/add-rule" style="margin-bottom:20px; padding-bottom:20px; border-bottom:1px solid #eee;">
                     <h4>📜 Добави ново фирмено правило за ток</h4>
                     <input type="text" name="rule_text" placeholder="Напишете правилото тук..." style="width:100%; padding:8px; margin:4px 0; box-sizing:border-box;" required><br>
                     <button type="submit" style="margin-top:8px; padding:10px 15px; background:#333; color:white; border:none; border-radius:4px; cursor:pointer; font-weight:bold;">Добави правило</button>
                 </form>
 
-                <!-- ФОРМА 3: ДОБАВЯНЕ НА ТЕСТ -->
                 <form method="POST" action="/add-test">
                     <h4>📝 Създай нов въпрос за тест</h4>
-                    <input type="text" name="question" placeholder="Въпрос (напр. Колко е тока?)" style="width:100%; padding:8px; margin:4px 0; box-sizing:border-box;" required><br>
+                    <input type="text" name="question" placeholder="Въпрос" style="width:100%; padding:8px; margin:4px 0; box-sizing:border-box;" required><br>
                     <input type="text" name="answer" placeholder="Правилен отговор" style="width:100%; padding:8px; margin:4px 0; box-sizing:border-box;" required><br>
                     <button type="submit" style="margin-top:8px; padding:10px 15px; background:#5cb85c; color:white; border:none; border-radius:4px; cursor:pointer; font-weight:bold;">Добави тест</button>
                 </form>
@@ -143,18 +140,13 @@ app.get('/', (req, res) => {
         `;
     }
 
-    // Секция с правила и тестове - скрита за обикновени мениджъри, видима за Шефове и Продавачи на ток
     let businessContent = '';
     if (isAdmin || isSales) {
         businessContent = `
             <div style="margin-top:30px; padding:20px; background:#eef6f9; border:1px solid #bce1ec; border-radius:6px;">
                 <h3 style="margin-top:0; color:#31708f;">⚡ Панел на Търговеца (Продажба на ток)</h3>
-                
                 <h4>📜 Текущи фирмени правила за продажби:</h4>
-                <ul style="padding-left:20px; margin:0 0 20px 0;">
-                    ${rulesRows}
-                </ul>
-
+                <ul style="padding-left:20px; margin:0 0 20px 0;">${rulesRows}</ul>
                 <h4>📝 Тестове за подготовка и изпити:</h4>
                 ${testsRows}
             </div>
@@ -183,3 +175,8 @@ app.get('/', (req, res) => {
                         }
                     }
                 }
+            </script>
+        </head>
+        <body style="font-family:Arial; background:#f4f4f9; padding:20px;">
+            <div style="max-width:750px; margin:0 auto; background:white; padding:25px; border-radius:8px; box-shadow:0 2px 5px rgba(0,0,0,0.1);">
+                <h2>Здравейте, ${req.session.user.name}!</h2>
