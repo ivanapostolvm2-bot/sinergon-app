@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="bg">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Система за Управление - Продажба на Ток</title>
+    <style>
+        body { font-family: Arial, sans-serif; background-color: #f4f4f9; margin: 0; padding: 20px; color: #333; }
+        .container { max-width: 750px; margin: 0 auto; background: white; padding: 25px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        .hidden { display: none !important; }
+        input, select, textarea { width: 100%; padding: 10px; margin: 8px 0; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px; }
+        button { padding: 12px 20px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 14px; width: 100%; }
+        .btn-blue { background-color: #0275d8; color: white; }
+        .btn-red { background-color: #d9534f; color: white; }
+        .btn-green { background-color: #5cb85c; color: white; }
+        .badge { display: inline-block; padding: 4px 8px; border-radius: 3px; font-size: 12px; font-weight: bold; color: white; }
+        .badge-admin { background-color: #d9534f; }
+        .badge-sales { background-color: #0275d8; }
+        .badge-manager { background-color: #f0ad4e; }
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+        th, td { border: 1px solid #ddd; padding: 12px; text-align: left; }
+        th { background-color: #f2f2f2; }
+        .section { margin-top: 30px; padding: 20px; border-radius: 6px; border: 1px solid #ddd; }
+        .admin-panel { background-color: #fdf7f7; border-color: #d9534f; }
+        .sales-panel { background-color: #eef6f9; border-color: #bce1ec; }
+        .logout-link { color: #d9534f; font-weight: bold; cursor: pointer; text-decoration: underline; float: right; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <!-- ЕКРАН 1: ВХОД -->
+    <div id="loginScreen">
+        <h2>Вход в енергийната система</h2>
+        <div id="loginError" style="color: red; font-weight: bold; margin-bottom: 10px;"></div>
+        <form id="loginForm" onsubmit="handleLogin(event)">
+            <label>Потребителско име:</label>
+            <input type="text" id="loginUsername" required placeholder="Пример: admin">
+            <label>Парола:</label>
+            <input type="password" id="loginPassword" required placeholder="Пример: admin123">
+            <button type="submit" class="btn-blue">Влез</button>
+        </form>
+        <p style="color: #666; font-size: 13px; text-align: center; margin-top: 15px;">Начален достъп: admin / admin123</p>
+    </div>
+
+    <!-- ЕКРАН 2: ОСНОВНО ТАБЛО -->
+    <div id="dashboardScreen" class="hidden">
+        <span class="logout-link" onclick="handleLogout()">Изход от профила</span>
+        <h2>Здравейте, <span id="userDisplayName"></span>!</h2>
+        <p>Вашата текуща роля: <span id="userRoleBadge" class="badge"></span></p>
+        <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;">
+
+        <!-- СПИСЪК СЪС СЛУЖИТЕЛИ -->
+        <h3>👥 Списък на персонала</h3>
+        <input type="text" id="searchInput" onkeyup="filterUsers()" placeholder="🔍 Бързо търсене на служител по име...">
+        <table>
+            <thead>
+                <tr>
+                    <th>Име и Фамилия</th>
+                    <th>Длъжност</th>
+                    <th>Ниво на достъп</th>
+                    <th id="thActions" class="hidden">Действия</th>
+                </tr>
+            </thead>
+            <tbody id="usersTableBody">
+                <!-- Потребителите се зареждат с JavaScript -->
+            </tbody>
+        </table>
+
+        <!-- ТЪРГОВСКИ ПАНЕЛ (За Администратори и Продаващи ток) -->
+        <div id="salesSection" class="section sales-panel class="hidden"">
+            <h3 style="margin-top: 0; color: #31708f;">⚡ Панел на Търговеца (Продажба на ток)</h3>
+            
+            <h4>📜 Фирмени правила и разпоредби:</h4>
+            <ul id="rulesList" style="padding-left: 20px;"></ul>
+
+            <h4>📝 Тестове за подготовка:</h4>
+            <div id="testsContainer"></div>
+        </div>
+
+        <!-- АДМИНИСТРАТИВЕН ПАНЕЛ (Само за Шефове) -->
+        <div id="adminSection" class="section admin-panel" class="hidden"">
+            <h3 style="margin-top: 0; color: #c9302c;">⚙️ Управление (Само за Шефове)</h3>
+            
+            <!-- Форма служител -->
+            <form onsubmit="addUser(event)" style="margin-bottom: 20px; padding-bottom: 20px; border-bottom: 1px solid #ddd;">
+                <h4>➕ Добави и дай права на нов човек</h4>
+                <input type="text" id="newUsername" placeholder="Потребителско име (напр. kire99)" required>
+                <input type="password" id="newPassword" placeholder="Парола" required>
+                <input type="text" id="newFullName" placeholder="Име и Фамилия" required>
+                <input type="text" id="newPosition" placeholder="Длъжност (напр. Продавач Енергия)" required>
+                <select id="newRole">
+                    <option value="sales">Продаващ ток (Вижда правила и тестове)</option>
+                    <option value="manager">Мениджър (Само преглед на списъка)</option>
+                    <option value="admin">Шеф / Admin (Пълни права)</option>
+                </select>
+                <button type="submit" class="btn-red">Запиши служителя</button>
+            </form>
+
+            <!-- Форма правило -->
+            <form onsubmit="addRule(event)" style="margin-bottom: 20px; padding-bottom: 20px; border-bottom: 1px solid #ddd;">
+                <h4>📜 Добави ново правило за продажби</h4>
+                <input type="text" id="ruleText" placeholder="Текст на правилото..." required>
+                <button type="submit" class="btn-blue" style="background:#333;">Добави правило</button>
+            </form>
+
+            <!-- Форма въпрос -->
+            <form onsubmit="addTest(event)">
+                <h4>📝 Добави въпрос към теста</h4>
+                <input type="text" id="testQuestion" placeholder="Въпрос..." required>
+                <input type="text" id="testAnswer" placeholder="Правилен отговор..." required>
+                <button type="submit" class="btn-green">Добави въпрос</button>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Начални данни в паметта на браузъра (Local Storage)
+    if (!localStorage.getItem('users')) {
+        localStorage.setItem('users', JSON.stringify([
+            { id: 1, username: 'admin', pass: 'admin123', name: 'Бачо Киро', position: 'Шеф', role: 'admin' },
+            { id: 2, username: 'ivan', pass: '123', name: 'Иван Иванов', position: 'Търговски представител', role: 'sales' }
+        ]));
+    }
+    if (!localStorage.getItem('rules')) {
+        localStorage.setItem('rules', JSON.stringify([
+            { id: 1, text: "Всички оферти за продажба на ток над 50 mWh изискват одобрение." },
+            { id: 2, text: "Срокът за плащане на таксите за свободен пазар е 15 дни." }
+        ]));
+    }
+    if (!localStorage.getItem('tests')) {
+        localStorage.setItem('tests', JSON.stringify([
+            { id: 1, question: "Какъв документ се издава при сделка?", answer: "Договор за снабдяване" }
+        ]));
+    }
+
+    let currentUser = null;
+
+    function renderAll() {
+        const users = JSON.parse(localStorage.getItem('users'));
+        const rules = JSON.parse(localStorage.getItem('rules'));
+        const tests = JSON.parse(localStorage.getItem('tests'));
+
+        if (!currentUser) return;
+
+        const isAdmin = currentUser.role === 'admin';
+        const isSales = currentUser.role === 'sales';
+
+        // Права за панели
+        document.getElementById('adminSection').classList.toggle('hidden', !isAdmin);
+        document.getElementById('thActions').classList.toggle('hidden', !isAdmin);
+        document.getElementById('salesSection').classList.toggle('hidden', !(isAdmin || isSales));
+
+        // Таблица служители
+        const tbody = document.getElementById('usersTableBody');
+        tbody.innerHTML = users.map(u => {
+            let roleTitle = u.role === 'admin' ? 'Шеф' : (u.role === 'sales' ? 'Продаващ ток' : 'Мениджър');
+            let badgeClass = u.role === 'admin' ? 'badge-admin' : (u.role === 'sales' ? 'badge-sales' : 'badge-manager');
+            let actionTd = isAdmin ? `<td style="padding:12px; border:1px solid #ddd;">${u.username !== currentUser.username ? `<button class="btn-red" style="padding:4px 8px; font-size:12px; width:auto;" onclick="deleteUser(${u.id})">❌ Триене</button>` : '-'}</td>` : '';
+            return `
+                <tr class="user-row">
+                    <td class="search-name" style="padding:12px; border:1px solid #ddd;">${u.name}</td>
+                    <td style="padding:12px; border:1px solid #ddd;">${u.position}</td>
+                    <td style="padding:12px; border:1px solid #ddd;"><span class="badge ${badgeClass}">${roleTitle}</span></td>
+                    ${actionTd}
+                </tr>
+            `;
+        }).join('');
+
+        // Списък правила
+        const rulesUl = document.getElementById('rulesList');
+        rulesUl.innerHTML = rules.map(r => `
+            <li style="padding:6px 0; border-bottom:1px dashed #eee;">
+                ${r.text} ${isAdmin ? `<span style="color:red; cursor:pointer; font-size:12px; margin-left:10px;" onclick="deleteRule(${r.id})">[Изтрий]</span>` : ''}
+            </li>
+        `).join('');
+
+        // Контейнер изпити
+        const testsDiv = document.getElementById('testsContainer');
+        testsDiv.innerHTML = tests.map(t => `
+            <div style="margin-bottom:12px; padding:10px; background:white; border-left:4px solid #0275d8; border-radius:4px;">
+                <p style="margin:0 0 4px 0; font-weight:bold;">Въпрос: ${t.question}</p>
+                <p style="margin:0; color:#555; font-size:14px;"><em>Правилен отговор: ${t.answer}</em></p>
