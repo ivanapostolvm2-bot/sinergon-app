@@ -10,11 +10,24 @@ app.use(session({
     saveUninitialized: true
 }));
 
-// Списък с потребители в паметта
+// База данни в паметта на сървъра
 if (!global.usersList) {
     global.usersList = [
         { id: 1, username: 'admin', pass: 'admin123', name: 'Бачо Киро', position: 'Шеф', role: 'admin' },
-        { id: 2, username: 'ivan', pass: '123', name: 'Иван Иванов', position: 'Мениджър', role: 'manager' }
+        { id: 2, username: 'ivan', pass: '123', name: 'Иван Иванов', position: 'Търговски представител', role: 'sales' }
+    ];
+}
+
+if (!global.rulesList) {
+    global.rulesList = [
+        { id: 1, text: "Всички оферти за продажба на ток на бизнес клиенти над 50 mWh трябва да се одобряват от Шефа." },
+        { id: 2, text: "Стандартният срок за плащане на фактурите за свободен пазар е 15 дни от издаването." }
+    ];
+}
+
+if (!global.testsList) {
+    global.testsList = [
+        { id: 1, question: "Какъв документ се издава при сключване на сделка за продажба на електроенергия?", answer: "Договор за снабдяване" }
     ];
 }
 
@@ -34,7 +47,7 @@ app.get('/', (req, res) => {
             <head><meta charset="UTF-8"><title>Вход</title></head>
             <body style="font-family:Arial; background:#f4f4f9;">
                 <div style="max-width:400px; margin:100px auto; background:white; padding:30px; border-radius:8px; box-shadow:0 2px 10px rgba(0,0,0,0.1);">
-                    <h2 style="margin-top:0;">Вход в системата</h2>
+                    <h2 style="margin-top:0;">Вход в системата за ток</h2>
                     ${errorMsg}
                     <form method="POST" action="/login">
                         <label>Потребителско име:</label>
@@ -50,43 +63,100 @@ app.get('/', (req, res) => {
     }
 
     const isAdmin = req.session.user.role === 'admin';
+    const isSales = req.session.user.role === 'sales';
 
-    // Генериране на редовете в таблицата
+    // Генериране на редовете в таблицата за служители
     let rows = global.usersList.map(u => {
         let deleteButton = '';
         if (isAdmin && u.username !== req.session.user.username) {
             deleteButton = `<a href="/delete-user/${u.id}" onclick="return confirm('Сигурни ли сте?')" style="color:#d9534f; text-decoration:none; font-weight:bold; margin-left:10px;">❌ Изтрий</a>`;
         }
+        let roleName = 'Мениджър';
+        if (u.role === 'admin') roleName = 'Шеф';
+        if (u.role === 'sales') roleName = 'Продаващ ток';
 
         return `
             <tr class="user-row">
                 <td class="search-name" style="padding:10px; border:1px solid #ddd;">${u.name}</td>
                 <td class="search-position" style="padding:10px; border:1px solid #ddd;">${u.position}</td>
                 <td style="padding:10px; border:1px solid #ddd;">
-                    <strong>${u.role === 'admin' ? 'Шеф' : 'Мениджър'}</strong>
+                    <strong>${roleName}</strong>
                     ${deleteButton}
                 </td>
             </tr>
         `;
     }).join('');
+
+    // Генериране на списъка с правила
+    let rulesRows = global.rulesList.map(r => `
+        <li style="padding:8px 0; border-bottom:1px dashed #eee;">
+            ${r.text} ${isAdmin ? `<a href="/delete-rule/${r.id}" style="color:red; text-decoration:none; font-size:12px; margin-left:10px;">[Изтрий]</a>` : ''}
+        </li>
+    `).join('');
+
+    // Генериране на тестовете
+    let testsRows = global.testsList.map(t => `
+        <div style="margin-bottom:15px; padding:10px; background:#f9f9f9; border-left:4px solid #0275d8;">
+            <p style="margin:0 0 5px 0; font-weight:bold;">Въпрос: ${t.question}</p>
+            <p style="margin:0; color:#555; font-size:14px;"><em>Правилен отговор: ${t.answer}</em></p>
+            ${isAdmin ? `<a href="/delete-test/${t.id}" style="color:red; text-decoration:none; font-size:12px;">[Изтрий въпроса]</a>` : ''}
+        </div>
+    `).join('');
     
-    // Форма за регистрация за админи
-    let adminForm = '';
+    // Административни форми
+    let adminPanel = '';
     if (isAdmin) {
-        adminForm = `
+        adminPanel = `
             <div style="margin-top:30px; padding:20px; background:#fdf7f7; border:2px solid #d9534f; border-radius:6px;">
-                <h4 style="margin-top:0; color:#c9302c;">➕ Регистрация на нов служител (Само за Шефове)</h4>
-                <form method="POST" action="/add-user">
-                    <input type="text" name="username" placeholder="Потребителско име" style="width:100%; padding:8px; margin:5px 0; box-sizing:border-box;" required><br>
-                    <input type="password" name="password" placeholder="Парола" style="width:100%; padding:8px; margin:5px 0; box-sizing:border-box;" required><br>
-                    <input type="text" name="full_name" placeholder="Име и Фамилия" style="width:100%; padding:8px; margin:5px 0; box-sizing:border-box;" required><br>
-                    <input type="text" name="position" placeholder="Длъжност" style="width:100%; padding:8px; margin:5px 0; box-sizing:border-box;" required><br>
-                    <select name="role" style="width:100%; padding:8px; margin:5px 0; box-sizing:border-box;">
-                        <option value="manager">Мениджър</option>
-                        <option value="admin">Шеф / Admin</option>
+                <h3 style="margin-top:0; color:#c9302c;">⚙️ Управление на системата (Само за Шефове)</h3>
+                
+                <!-- ФОРМА 1: РЕГИСТРАЦИЯ -->
+                <form method="POST" action="/add-user" style="margin-bottom:20px; padding-bottom:20px; border-bottom:1px solid #eee;">
+                    <h4>➕ Регистрация на нов човек</h4>
+                    <input type="text" name="username" placeholder="Потребителско име" style="width:100%; padding:8px; margin:4px 0; box-sizing:border-box;" required><br>
+                    <input type="password" name="password" placeholder="Парола" style="width:100%; padding:8px; margin:4px 0; box-sizing:border-box;" required><br>
+                    <input type="text" name="full_name" placeholder="Име и Фамилия" style="width:100%; padding:8px; margin:4px 0; box-sizing:border-box;" required><br>
+                    <input type="text" name="position" placeholder="Длъжност (напр. Продажби Енергия)" style="width:100%; padding:8px; margin:4px 0; box-sizing:border-box;" required><br>
+                    <select name="role" style="width:100%; padding:8px; margin:4px 0; box-sizing:border-box;">
+                        <option value="sales">Продаващ ток (Вижда правилата и тестовете)</option>
+                        <option value="manager">Мениджър (Само преглед на списъка)</option>
+                        <option value="admin">Шеф / Admin (Пълни права)</option>
                     </select><br>
-                    <button type="submit" style="margin-top:10px; padding:10px 20px; background:#d9534f; color:white; border:none; border-radius:4px; cursor:pointer; font-weight:bold;">💾 Регистрирай</button>
+                    <button type="submit" style="margin-top:8px; padding:10px 15px; background:#d9534f; color:white; border:none; border-radius:4px; cursor:pointer; font-weight:bold;">Регистрирай служител</button>
                 </form>
+
+                <!-- ФОРМА 2: ДОБАВЯНЕ НА ПРАВИЛО -->
+                <form method="POST" action="/add-rule" style="margin-bottom:20px; padding-bottom:20px; border-bottom:1px solid #eee;">
+                    <h4>📜 Добави ново фирмено правило за ток</h4>
+                    <input type="text" name="rule_text" placeholder="Напишете правилото тук..." style="width:100%; padding:8px; margin:4px 0; box-sizing:border-box;" required><br>
+                    <button type="submit" style="margin-top:8px; padding:10px 15px; background:#333; color:white; border:none; border-radius:4px; cursor:pointer; font-weight:bold;">Добави правило</button>
+                </form>
+
+                <!-- ФОРМА 3: ДОБАВЯНЕ НА ТЕСТ -->
+                <form method="POST" action="/add-test">
+                    <h4>📝 Създай нов въпрос за тест</h4>
+                    <input type="text" name="question" placeholder="Въпрос (напр. Колко е тока?)" style="width:100%; padding:8px; margin:4px 0; box-sizing:border-box;" required><br>
+                    <input type="text" name="answer" placeholder="Правилен отговор" style="width:100%; padding:8px; margin:4px 0; box-sizing:border-box;" required><br>
+                    <button type="submit" style="margin-top:8px; padding:10px 15px; background:#5cb85c; color:white; border:none; border-radius:4px; cursor:pointer; font-weight:bold;">Добави тест</button>
+                </form>
+            </div>
+        `;
+    }
+
+    // Секция с правила и тестове - скрита за обикновени мениджъри, видима за Шефове и Продавачи на ток
+    let businessContent = '';
+    if (isAdmin || isSales) {
+        businessContent = `
+            <div style="margin-top:30px; padding:20px; background:#eef6f9; border:1px solid #bce1ec; border-radius:6px;">
+                <h3 style="margin-top:0; color:#31708f;">⚡ Панел на Търговеца (Продажба на ток)</h3>
+                
+                <h4>📜 Текущи фирмени правила за продажби:</h4>
+                <ul style="padding-left:20px; margin:0 0 20px 0;">
+                    ${rulesRows}
+                </ul>
+
+                <h4>📝 Тестове за подготовка и изпити:</h4>
+                ${testsRows}
             </div>
         `;
     }
@@ -96,7 +166,7 @@ app.get('/', (req, res) => {
         <html>
         <head>
             <meta charset="UTF-8">
-            <title>Табло</title>
+            <title>Система за Енергия</title>
             <script>
                 function filterUsers() {
                     let input = document.getElementById('searchInput').value.toLowerCase();
@@ -113,92 +183,3 @@ app.get('/', (req, res) => {
                         }
                     }
                 }
-            </script>
-        </head>
-        <body style="font-family:Arial; background:#f4f4f9; padding:20px;">
-            <div style="max-width:700px; margin:0 auto; background:white; padding:25px; border-radius:8px; box-shadow:0 2px 5px rgba(0,0,0,0.1);">
-                <h2>Здравейте, ${req.session.user.name}!</h2>
-                <p>Роля: <strong>${req.session.user.role === 'admin' ? 'Шеф' : 'Мениджър'}</strong> | <a href="/logout" style="color:#d9534f; font-weight:bold;">Изход</a></p>
-                <hr style="border:0; border-top:1px solid #eee; margin:20px 0;">
-                
-                ${successMsg}
-                ${errorMsg}
-
-                <h3>📋 Списък на служителите:</h3>
-                <input type="text" id="searchInput" onkeyup="filterUsers()" placeholder="🔍 Търсене по име или длъжност..." style="width:100%; padding:10px; margin-bottom:15px; border:1px solid #ccc; border-radius:4px; box-sizing:border-box;">
-
-                <table style="width:100%; border-collapse:collapse;">
-                    <tr style="background:#f2f2f2; text-align:left;">
-                        <th style="padding:10px; border:1px solid #ddd;">Име и Фамилия</th>
-                        <th style="padding:10px; border:1px solid #ddd;">Длъжност</th>
-                        <th style="padding:10px; border:1px solid #ddd;">Права</th>
-                    </tr>
-                    ${rows}
-                </table>
-                ${adminForm}
-            </div>
-        </body>
-        </html>
-    `);
-});
-
-// ЛОГИКА ЗА ВХОД
-app.post('/login', (req, res) => {
-    const username = req.body.username;
-    const password = req.body.password;
-    
-    let foundUser = global.usersList.find(u => u.username === username && u.pass === password);
-    
-    if (foundUser) {
-        req.session.user = foundUser;
-        res.redirect('/');
-    } else {
-        req.session.error = "❌ Грешно потребителско име или парола!";
-        res.redirect('/');
-    }
-});
-
-// ЛОГИКА ЗА РЕГИСТРАЦИЯ
-app.post('/add-user', (req, res) => {
-    if (req.session.user && req.session.user.role === 'admin') {
-        const username = req.body.username;
-        const password = req.body.password;
-        const full_name = req.body.full_name;
-        const position = req.body.position;
-        const role = req.body.role;
-
-        let exists = global.usersList.some(u => u.username === username);
-        if (exists) {
-            req.session.error = "❌ Потребителското име е заето!";
-        } else {
-            global.usersList.push({
-                id: Date.now(),
-                username: username,
-                pass: password,
-                name: full_name,
-                position: position,
-                role: role
-            });
-            req.session.success = `✅ Успешно регистрирахте ${full_name}!`;
-        }
-    }
-    res.redirect('/');
-});
-
-// ЛОГИКА ЗА ИЗТРИВАНЕ
-app.get('/delete-user/:id', (req, res) => {
-    if (req.session.user && req.session.user.role === 'admin') {
-        const userId = parseInt(req.params.id);
-        global.usersList = global.usersList.filter(u => u.id !== userId);
-        req.session.success = `❌ Служителят беше изтрит.`;
-    }
-    res.redirect('/');
-});
-
-// ИЗХОД
-app.get('/logout', (req, res) => {
-    req.session.destroy();
-    res.redirect('/');
-});
-
-app.listen(PORT, () => console.log(`Работа на порт ${PORT}`));
