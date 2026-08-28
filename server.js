@@ -54,7 +54,6 @@ app.get('/', (req, res) => {
 
     // Генериране на редовете в таблицата с вграден бутон за изтриване за админи
     let rows = global.usersList.map(u => {
-        // Шефът не може да изтрие сам себе си от бутона
         let deleteButton = '';
         if (isAdmin && u.username !== req.session.user.username) {
             deleteButton = `<a href="/delete-user/${u.id}" onclick="return confirm('Сигурни ли сте, че искате да изтриете този служител?')" style="color:#d9534f; text-decoration:none; font-weight:bold; margin-left:10px;">❌ Изтрий</a>`;
@@ -100,14 +99,17 @@ app.get('/', (req, res) => {
             <meta charset="UTF-8">
             <title>Табло</title>
             <script>
-                // Функция за бързо търсене в реално време
+                // Функция за бързо търсене в реално време през браузъра
                 function filterUsers() {
                     let input = document.getElementById('searchInput').value.toLowerCase();
                     let rows = document.getElementsByClassName('user-row');
                     
                     for (let i = 0; i < rows.length; i++) {
-                        let name = rows[i].getElementsByClassName('search-name')[0].innerText.toLowerCase();
-                        let position = rows[i].getElementsByClassName('search-position')[0].innerText.toLowerCase();
+                        let nameEl = rows[i].querySelector('.search-name');
+                        let posEl = rows[i].querySelector('.search-position');
+                        
+                        let name = nameEl ? nameEl.textContent.toLowerCase() : '';
+                        let position = posEl ? posEl.textContent.toLowerCase() : '';
                         
                         if (name.includes(input) || position.includes(input)) {
                             rows[i].style.display = "";
@@ -172,7 +174,7 @@ app.post('/add-user', (req, res) => {
             req.session.error = "❌ Това потребителско име вече е заето!";
         } else {
             global.usersList.push({
-                id: Date.now(), // Генерираме уникално ID спрямо текущото време за бутона за триене
+                id: Date.now(),
                 username: username,
                 pass: password,
                 name: full_name,
@@ -191,18 +193,21 @@ app.post('/add-user', (req, res) => {
 app.get('/delete-user/:id', (req, res) => {
     if (req.session.user && req.session.user.role === 'admin') {
         const userId = parseInt(req.params.id);
-        
-        // Намираме човека за триене, преди да го махнем (за съобщението)
         let userToDelete = global.usersList.find(u => u.id === userId);
         
         if (userToDelete) {
-            // Премахваме го от масива
             global.usersList = global.usersList.filter(u => u.id !== userId);
-            req.session.success = `❌ Потребителят ${userToDelete.name} беше успешно изтрит от системата.`;
+            req.session.success = `❌ Потребителят ${userToDelete.name} беше успешно изтрит.`;
         }
     } else {
-        req.session.error = "❌ Нямате права за изтриване на служители!";
+        req.session.error = "❌ Нямате права за изтриване!";
     }
+    res.redirect('/');
+});
+
+// ИЗХОД
+app.get('/logout', (req, res) => {
+    req.session.destroy();
     res.redirect('/');
 });
 
