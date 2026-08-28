@@ -5,31 +5,25 @@ const PORT = process.env.PORT || 3000;
 
 app.use(express.urlencoded({ extended: true }));
 app.use(session({
-    secret: 'tainen-kluch-123',
+    secret: 'sinergon-secret-key-456',
     resave: false,
     saveUninitialized: true
 }));
 
-// База данни в паметта на сървъра
-if (!global.usersList) {
-    global.usersList = [
-        { id: 1, username: 'admin', pass: 'admin123', name: 'Бачо Киро', position: 'Шеф', role: 'admin' },
-        { id: 2, username: 'ivan', pass: '123', name: 'Иван Иванов', position: 'Търговски представител', role: 'sales' }
-    ];
-}
+// Списъци с данни (Базова памет)
+let usersList = [
+    { id: 1, username: 'admin', pass: 'admin123', name: 'Бачо Киро', position: 'Шеф', role: 'admin' },
+    { id: 2, username: 'ivan', pass: '123', name: 'Иван Иванов', position: 'Търговски представител', role: 'sales' }
+];
 
-if (!global.rulesList) {
-    global.rulesList = [
-        { id: 1, text: "Всички оферти за продажба на ток на бизнес клиенти над 50 mWh трябва да се одобряват от Шефа." },
-        { id: 2, text: "Стандартният срок за плащане на фактурите за свободен пазар е 15 дни от издаването." }
-    ];
-}
+let rulesList = [
+    { id: 1, text: "Всички оферти за продажба на ток на бизнес клиенти над 50 mWh трябва да се одобряват от Шефа." },
+    { id: 2, text: "Стандартният срок за плащане на фактурите за свободен пазар е 15 дни от издаването." }
+];
 
-if (!global.testsList) {
-    global.testsList = [
-        { id: 1, question: "Какъв документ се издава при сключване на сделка за продажба на електроенергия?", answer: "Договор за снабдяване" }
-    ];
-}
+let testsList = [
+    { id: 1, question: "Какъв документ се издава при сключване на сделка за продажба на електроенергия?", answer: "Договор за снабдяване" }
+];
 
 // ГЛАВНА СТРАНИЦА
 app.get('/', (req, res) => {
@@ -39,13 +33,13 @@ app.get('/', (req, res) => {
     req.session.error = null;
     req.session.success = null;
 
-    // 1. АКО НЕ Е ВЛЯЗЪЛ -> ФОРМА ЗА ВХОД
+    // ФОРМА ЗА ВХОД (Ако потребителят не е влязъл)
     if (!req.session.user) {
         return res.send(`
             <!DOCTYPE html>
             <html>
             <head><meta charset="UTF-8"><title>Вход</title></head>
-            <body style="font-family:Arial; background:#f4f4f9;">
+            <body style="font-family:Arial; background:#f4f4f9; margin:0; padding:20px;">
                 <div style="max-width:400px; margin:100px auto; background:white; padding:30px; border-radius:8px; box-shadow:0 2px 10px rgba(0,0,0,0.1);">
                     <h2 style="margin-top:0;">Вход в системата за ток</h2>
                     ${errorMsg}
@@ -66,7 +60,7 @@ app.get('/', (req, res) => {
     const isSales = req.session.user.role === 'sales';
 
     // Таблица служители
-    let rows = global.usersList.map(u => {
+    let rows = usersList.map(u => {
         let deleteButton = '';
         if (isAdmin && u.username !== req.session.user.username) {
             deleteButton = `<a href="/delete-user/${u.id}" onclick="return confirm('Сигурни ли сте?')" style="color:#d9534f; text-decoration:none; font-weight:bold; margin-left:10px;">❌ Изтрий</a>`;
@@ -88,14 +82,14 @@ app.get('/', (req, res) => {
     }).join('');
 
     // Списък правила
-    let rulesRows = global.rulesList.map(r => `
+    let rulesRows = rulesList.map(r => `
         <li style="padding:8px 0; border-bottom:1px dashed #eee;">
             ${r.text} ${isAdmin ? `<a href="/delete-rule/${r.id}" style="color:red; text-decoration:none; font-size:12px; margin-left:10px;">[Изтрий]</a>` : ''}
         </li>
     `).join('');
 
     // Тестове
-    let testsRows = global.testsList.map(t => `
+    let testsRows = testsList.map(t => `
         <div style="margin-bottom:15px; padding:10px; background:#f9f9f9; border-left:4px solid #0275d8;">
             <p style="margin:0 0 5px 0; font-weight:bold;">Въпрос: ${t.question}</p>
             <p style="margin:0; color:#555; font-size:14px;"><em>Правилен отговор: ${t.answer}</em></p>
@@ -103,7 +97,7 @@ app.get('/', (req, res) => {
         </div>
     `).join('');
     
-    // Административни форми
+    // Панел за управление на Шефа
     let adminPanel = '';
     if (isAdmin) {
         adminPanel = `
